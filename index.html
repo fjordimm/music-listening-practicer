@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Piano Trainer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@300;500;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #D8C1B4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: 'Mukta', sans-serif;
+      padding: 0 15px 15px 15px;
+      overflow-y: auto;
+    }
+
+    .tabs { display: flex; margin-bottom: 12px; }
+
+    .tab {
+      padding: 3px 22px;
+      cursor: pointer;
+      background: #C9B2A4;
+      color: #473742;
+      border-radius: 0 0 12px 12px;
+      font-weight: 700;
+    }
+
+    .tab.active { background: #473742; color: #D8C1B4; }
+
+    .view { display: none; width: 100%; max-width: 900px; text-align: center; }
+    .view.active { display: block; }
+
+    .training-container {
+      margin-top: 6px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      gap: 10px;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+
+    .key-unit {
+      background: #C9B2A4;
+      padding: 10px 24px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .key-display-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .key-controls { display: flex; gap: 8px; }
+
+    .sequence-unit {
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+      gap: 8px;
+      flex: 2;
+      min-width: 200px;
+    }
+    .key-display { font-size: 1.8rem; color: #473742; font-weight: 500; white-space: nowrap; }
+    .key-display span { font-weight: 800; }
+
+    .speaker-btn {
+      background: #473742;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      width: 34px;
+      height: 34px;
+      color: #D8C1B4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-left: 3px;
+      opacity: 0.85;
+      flex-shrink: 0;
+    }
+    .speaker-btn:hover { opacity: 1; }
+    .circles-row { display: flex; align-items: center; gap: 8px; width: 100%; justify-content: center; }
+    .key-controls { display: flex; gap: 8px; width: 100%; }
+
+    .sliders-stack { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+    .labeled-slider { display: flex; align-items: center; gap: 8px; width: 100%; }
+    .slider-label { font-size: 0.75rem; font-weight: 700; color: #473742; white-space: nowrap; }
+    .slider-val { font-size: 1rem; font-weight: 800; color: #473742; min-width: 20px; text-align: right; }
+    .slider-container { flex: 1; margin: 0; }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      background: #C9B2A4;
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+      display: block;
+      overflow: visible;
+    }
+
+    input[type=range]::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 4px;
+      background: transparent;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      background: #473742;
+      border: none;
+      margin-top: -6px;
+    }
+
+    input[type=range]::-moz-range-track { background: #C9B2A4; height: 8px; border-radius: 4px; }
+    input[type=range]::-moz-range-thumb { height: 20px; width: 20px; background: #473742; border-radius: 50%; border: none; }
+
+    .circle-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-height: 38px; }
+
+    .note-circle {
+      width: 46px;
+      height: 46px;
+      background: #C9B2A4;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #473742;
+      font-weight: 800;
+      font-size: 1.1rem;
+      transition: background 0.15s, color 0.15s;
+    }
+    .note-circle.chord { font-size: 0.72rem; flex-direction: column; gap: 1px; }
+    .note-circle.chord:not(.correct) span { font-size: 1.1rem; font-style: normal; font-weight: 800; }
+    .note-circle.chord .chord-roman { font-size: 0.55rem; font-weight: 600; line-height: 1; }
+    .note-circle.correct { background: #6a9e6a; color: #fff; }
+    .note-circle.correct .chord-roman { opacity: 0.75; }
+    .note-circle.correct.tonicshift { background: #6a9e6a; color: #a8d4f5; }
+    .note-circle.correct.tonicshift .chord-roman { color: #7ab0cc; opacity: 1; }
+    .note-circle.correct.chromatic { background: #6a9e6a; color: #f5c87a; }
+    .note-circle.correct.chromatic .chord-roman { color: #c9a06a; opacity: 1; }
+    .note-circle.wrong { background: #b85c5c; color: #fff; }
+
+    .control-btn {
+      background: #473742;
+      color: #D8C1B4;
+      border: none;
+      padding: 7px 0;
+      border-radius: 12px;
+      font-family: 'Mukta', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      flex: 1;
+    }
+    .control-btn:hover { opacity: 0.85; }
+    .secondary-btns { display: flex; gap: 8px; width: 100%; }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #473742;
+      cursor: pointer;
+      width: 100%;
+    }
+    .checkbox-label input[type=checkbox] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      border: 1.5px solid #473742;
+      background: #C9B2A4;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .checkbox-label input[type=checkbox]:checked {
+      background: #473742;
+    }
+    .checkbox-label input[type=checkbox]:checked::after {
+      content: '';
+      display: block;
+      width: 4px;
+      height: 8px;
+      border: 2px solid #D8C1B4;
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg) translate(-1px, -1px);
+    }
+
+    .piano-wrapper { background: #473742; border-radius: 1.5vw; padding: 1.5vw; width: 100%; margin-bottom: 10px; }
+    #piano-section { width: calc(100% - 30px); margin-top: auto; }
+    .piano { display: flex; position: relative; width: 100%; aspect-ratio: 15 / 4; user-select: none; }
+    .key { cursor: pointer; }
+    .white { flex: 1; height: 100%; background: #D8C1B4; border-right: 0.1vw solid #473742; z-index: 1; border-radius: 0 0 1vw 1vw; }
+    .white.first-key { border-left: 0.1vw solid #473742; border-radius: 1vw 0 1vw 1vw; }
+    .white.last-key { border-radius: 0 1vw 1vw 1vw; }
+    .white.active { background: #c4a99a; }
+    .black { width: calc((100% / 15) * 0.65); height: 60%; background: #221a20; position: absolute; z-index: 2; border-radius: 0 0 0.7vw 0.7vw; }
+    .black.active { background: #6b5565; }
+
+  </style>
+</head>
+<body>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('notes')">Notes</div>
+    <div class="tab" onclick="switchTab('chords')">Chords</div>
+  </div>
+
+  <div id="notes-view" class="view active">
+    <div class="training-container">
+      <div class="key-unit">
+        <div class="key-display-row">
+          <div class="key-display">Key: <span id="current-key-text">--</span></div>
+          <button class="speaker-btn" onclick="playCadence()" title="Play cadence">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+          </button>
+        </div>
+        <div class="key-controls">
+            <button class="control-btn" onclick="silenceAll(); generateNewKey(); playCadence()">Next</button>
+        </div>
+      </div>
+
+      <div class="sequence-unit">
+        <div class="sliders-stack">
+          <div class="labeled-slider">
+            <span class="slider-label">Max jump</span>
+            <span class="slider-val" id="jump-value-display">7</span>
+            <div class="slider-container">
+              <input type="range" id="jump-slider" min="1" max="24" value="7" oninput="handleJumpChange()">
+            </div>
+          </div>
+          <div class="labeled-slider">
+            <div class="slider-container">
+              <input type="range" id="note-count-slider" min="1" max="16" value="3" oninput="handleSliderChange()">
+            </div>
+          </div>
+        </div>
+        <div class="circles-row">
+          <div id="circle-container" class="circle-container"></div>
+          <button class="speaker-btn" onclick="playCurrentSequence()" title="Play notes">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+          </button>
+        </div>
+        <div class="secondary-btns">
+          <button class="control-btn" onclick="revealSequence()">Reveal</button>
+          <button class="control-btn" onclick="silenceAll(); generateNewSequence(); playCurrentSequence()">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="chords-view" class="view">
+    <div class="training-container">
+      <div class="key-unit">
+        <div class="key-display-row">
+          <div class="key-display">Key: <span id="chords-key-text">--</span></div>
+          <button class="speaker-btn" onclick="chords.playCadence()" title="Play cadence">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+          </button>
+        </div>
+        <div class="key-controls">
+          <button class="control-btn" onclick="silenceAll(); chords.generateNewKey(); chords.playCadence()">Next</button>
+        </div>
+      </div>
+
+      <div class="sequence-unit">
+        <label class="checkbox-label">
+          <input type="checkbox" id="outside-key-checkbox" checked>
+          Non-diatonic chords
+        </label>
+        <div class="sliders-stack">
+          <div class="labeled-slider">
+            <div class="slider-container">
+              <input type="range" id="chord-count-slider" min="1" max="8" value="3" oninput="chords.handleSliderChange()">
+            </div>
+          </div>
+        </div>
+        <div class="circles-row">
+          <div id="chord-container" class="circle-container"></div>
+          <button class="speaker-btn" onclick="chords.playSequence()" title="Play chords">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+          </button>
+        </div>
+        <div class="secondary-btns">
+          <button class="control-btn" onclick="chords.reveal()">Reveal</button>
+          <button class="control-btn" onclick="silenceAll(); chords.generateNewSequence(); chords.playSequence()">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="piano-section">
+    <div class="piano-wrapper">
+      <div class="piano" id="piano"></div>
+    </div>
+  </div>
+
+  <script>
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContext();
+
+    const notes = [
+      { name: 'C4', freq: 261.63, type: 'white' }, { name: 'C#4', freq: 277.18, type: 'black' },
+      { name: 'D4', freq: 293.66, type: 'white' }, { name: 'D#4', freq: 311.13, type: 'black' },
+      { name: 'E4', freq: 329.63, type: 'white' }, { name: 'F4', freq: 349.23, type: 'white' },
+      { name: 'F#4', freq: 369.99, type: 'black' }, { name: 'G4', freq: 392.00, type: 'white' },
+      { name: 'G#4', freq: 415.30, type: 'black' }, { name: 'A4', freq: 440.00, type: 'white' },
+      { name: 'A#4', freq: 466.16, type: 'black' }, { name: 'B4', freq: 493.88, type: 'white' },
+      { name: 'C5', freq: 523.25, type: 'white' }, { name: 'C#5', freq: 554.37, type: 'black' },
+      { name: 'D5', freq: 587.33, type: 'white' }, { name: 'D#5', freq: 622.25, type: 'black' },
+      { name: 'E5', freq: 659.25, type: 'white' }, { name: 'F5', freq: 698.46, type: 'white' },
+      { name: 'F#5', freq: 739.99, type: 'black' }, { name: 'G5', freq: 783.99, type: 'white' },
+      { name: 'G#5', freq: 830.61, type: 'black' }, { name: 'A5', freq: 880.00, type: 'white' },
+      { name: 'A#5', freq: 932.33, type: 'black' }, { name: 'B5', freq: 987.77, type: 'white' },
+      { name: 'C6', freq: 1046.50, type: 'white' }
+    ];
+
+    const noteNamesPool = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const majorIntervals = [0, 2, 4, 5, 7, 9, 11];
+
+    // Enharmonic equivalents: sharp -> flat
+    const enharmonics = { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' };
+    const flatToSharp = Object.fromEntries(Object.entries(enharmonics).map(([k,v]) => [v,k]));
+
+    // Keys that conventionally use flats (Db, Eb, Ab, Bb; Gb is debatable but include it)
+    const flatKeys = new Set(['Db', 'Eb', 'Gb', 'Ab', 'Bb']);
+
+    // Given a key's display label, return the preferred spelling for a pitch class (sharp name)
+    function preferredSpelling(sharpName, keyDisplayLabel) {
+        const useFlats = flatKeys.has(keyDisplayLabel);
+        if (useFlats && enharmonics[sharpName]) return enharmonics[sharpName];
+        return sharpName;
+    }
+
+    let currentKey = null;
+    let currentSequence = [];
+    let currentNoteIndex = 0;
+    let activeNodes = [];
+
+    function handleSliderChange() {
+        updateSliderFill();
+        generateNewSequence();
+    }
+
+    function handleJumpChange() {
+        const slider = document.getElementById('jump-slider');
+        document.getElementById('jump-value-display').innerText = slider.value;
+        updateJumpFill();
+    }
+
+    function updateSliderFill() {
+        const slider = document.getElementById('note-count-slider');
+        const val = (slider.value - slider.min) / (slider.max - slider.min) * 100;
+        slider.style.background = `linear-gradient(to right, #473742 ${val}%, #C9B2A4 ${val}%)`;
+    }
+
+    function updateJumpFill() {
+        const slider = document.getElementById('jump-slider');
+        const val = (slider.value - slider.min) / (slider.max - slider.min) * 100;
+        slider.style.background = `linear-gradient(to right, #473742 ${val}%, #C9B2A4 ${val}%)`;
+    }
+
+    function generateNewSequence() {
+        if (!currentKey) return;
+        const slider = document.getElementById('note-count-slider');
+        const count = parseInt(slider.value);
+        const maxJump = parseInt(document.getElementById('jump-slider').value);
+        const container = document.getElementById('circle-container');
+        container.innerHTML = '';
+        currentSequence = [];
+
+        // Use sharp label for scale lookup (noteNamesPool is sharps-based)
+        const lookupLabel = currentKey.sharpLabel || currentKey.displayLabel;
+        const rootIndex = noteNamesPool.indexOf(lookupLabel);
+        const allowedNames = majorIntervals.map(i => noteNamesPool[(rootIndex + i) % 12]);
+        const scalePool = notes.filter(n => allowedNames.includes(n.name.replace(/[0-9]/g, '')));
+
+        const noteOrder = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        function semitoneIndex(noteName) {
+            const oct = parseInt(noteName.match(/\d+/)[0]);
+            const pitch = noteName.replace(/[0-9]/g, '');
+            return oct * 12 + noteOrder.indexOf(pitch);
+        }
+
+        for (let i = 0; i < count; i++) {
+            let candidates;
+            if (i === 0 || maxJump >= 24) {
+                candidates = scalePool;
+            } else {
+                const prevSemi = semitoneIndex(currentSequence[i - 1].name);
+                candidates = scalePool.filter(n => Math.abs(semitoneIndex(n.name) - prevSemi) <= maxJump);
+                if (candidates.length === 0) candidates = scalePool;
+            }
+            const randomNote = candidates[Math.floor(Math.random() * candidates.length)];
+            const pitchSharp = randomNote.name.replace(/[0-9]/g, '');
+            const displayPitch = preferredSpelling(pitchSharp, currentKey.displayLabel);
+            currentSequence.push({ ...randomNote, displayPitch });
+            const circle = document.createElement('div');
+            circle.className = 'note-circle';
+            circle.innerText = '?';
+            container.appendChild(circle);
+        }
+        currentNoteIndex = 0;
+    }
+
+    function generateNewKey() {
+        // Strictly restricted to F#4 (index 6) through F5 (index 17)
+        const rootPool = notes.slice(6, 18);
+        const selectedRoot = rootPool[Math.floor(Math.random() * rootPool.length)];
+        
+        const sharpName = selectedRoot.name.replace(/[0-9]/g, '');
+        // For black keys, randomly pick sharp or flat spelling
+        let displayLabel;
+        if (enharmonics[sharpName]) {
+            displayLabel = Math.random() < 0.5 ? sharpName : enharmonics[sharpName];
+        } else {
+            displayLabel = sharpName;
+        }
+        currentKey = { displayLabel, sharpLabel: sharpName, rootFreq: selectedRoot.freq };
+        
+        document.getElementById('current-key-text').innerText = displayLabel;
+        generateNewSequence();
+    }
+
+    function silenceAll() {
+        activeNodes.forEach(({ osc, gain }) => {
+            try {
+                gain.gain.cancelScheduledValues(ctx.currentTime);
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                osc.stop(ctx.currentTime);
+            } catch(e) {}
+        });
+        activeNodes = [];
+    }
+
+    function playNote(freq, startTime = ctx.currentTime, duration = 0.8, volume = 0.25) {
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, startTime);
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+      const entry = { osc, gain: gainNode };
+      activeNodes.push(entry);
+      osc.onended = () => { activeNodes = activeNodes.filter(n => n !== entry); };
+    }
+
+    function playCurrentSequence() {
+        ctx.resume();
+        const now = ctx.currentTime;
+        currentSequence.forEach((note, index) => {
+            playNote(note.freq, now + (index * 0.38), 0.8);
+        });
+    }
+
+    function playCadence() {
+        if (!currentKey) return;
+        ctx.resume();
+        // Play at the ACTUAL root frequency selected (F#4-F5)
+        let root = currentKey.rootFreq;
+        const now = ctx.currentTime;
+        const playChord = (offs, time) => offs.forEach(o => playNote(root * Math.pow(2, o / 12), time, 1.2, 0.15));
+        
+        playChord([0, 4, 7], now); 
+        playChord([0, 5, 9], now + 0.45); 
+        playChord([-1, 2, 7], now + 0.9); 
+        playChord([0, 4, 7], now + 1.35);
+    }
+
+    function revealSequence() {
+        const circles = document.getElementById('circle-container').children;
+        currentSequence.forEach((note, i) => {
+            const circle = circles[i];
+            if (!circle.classList.contains('correct')) {
+                circle.innerText = note.displayPitch;
+                circle.classList.remove('wrong');
+                circle.classList.add('correct');
+            }
+        });
+        currentNoteIndex = currentSequence.length;
+    }
+
+    function handleGuess(noteName) {
+        if (!currentSequence.length || currentNoteIndex >= currentSequence.length) return;
+        const circles = document.getElementById('circle-container').children;
+        const target = currentSequence[currentNoteIndex].name;
+        const circle = circles[currentNoteIndex];
+        if (noteName === target) {
+            circle.innerText = currentSequence[currentNoteIndex].displayPitch;
+            circle.classList.remove('wrong');
+            circle.classList.add('correct');
+            currentNoteIndex++;
+        } else {
+            circle.classList.remove('wrong');
+            void circle.offsetWidth;
+            circle.classList.add('wrong');
+        }
+    }
+
+    const keyMap = {'a':'C4','w':'C#4','s':'D4','e':'D#4','d':'E4','f':'F4','t':'F#4','g':'G4','y':'G#4','h':'A4','u':'A#4','j':'B4','k':'C5','o':'C#5','l':'D5','p':'D#5',';':'E5',"'":'F5','[':'F#5',']':'G5'};
+    const piano = document.getElementById('piano');
+    const noteElements = {};
+
+    const whiteNotes = notes.filter(n => n.type === 'white');
+    whiteNotes.forEach((note, idx) => {
+      const el = document.createElement('div');
+      el.className = 'key white';
+      if (idx === 0) el.classList.add('first-key');
+      if (idx === whiteNotes.length - 1) el.classList.add('last-key');
+      el.onmousedown = () => { ctx.resume(); playNote(note.freq); el.classList.add('active'); if (activeTab === 'notes') handleGuess(note.name); };
+      el.onmouseup = () => el.classList.remove('active');
+      el.onmouseleave = () => el.classList.remove('active');
+      piano.appendChild(el);
+      noteElements[note.name] = el;
+    });
+
+    notes.forEach((note, i) => {
+      if (note.type !== 'black') return;
+      const el = document.createElement('div');
+      el.className = 'key black';
+      const prevWhites = notes.slice(0, i).filter(n => n.type === 'white').length;
+      el.style.left = `calc(${(prevWhites / 15) * 100}% - ${(0.65/15*100)/2}%)`;
+      el.onmousedown = (e) => { e.stopPropagation(); ctx.resume(); playNote(note.freq); el.classList.add('active'); if (activeTab === 'notes') handleGuess(note.name); };
+      el.onmouseup = () => el.classList.remove('active');
+      el.onmouseleave = () => el.classList.remove('active');
+      piano.appendChild(el);
+      noteElements[note.name] = el;
+    });
+
+    // ── Chords tab state ──────────────────────────────────────────────────────
+    // Scale degree semitone offsets from root
+    const scaleDegrees = [0, 2, 4, 5, 7, 9, 11];
+    // Chord quality per diatonic degree in major: M m m M M m dim
+    const chordQualities = ['maj','min','min','maj','maj','min','dim'];
+    // Triad intervals per degree
+    const triadIntervals = [
+      [0,4,7], [0,3,7], [0,3,7], [0,4,7], [0,4,7], [0,3,7], [0,3,6]
+    ];
+    // Seventh chord intervals per degree (maj7, min7, min7, maj7, dom7, min7, min7b5)
+    const seventhIntervals = [
+      [0,4,7,11], [0,3,7,10], [0,3,7,10], [0,4,7,11], [0,4,7,10], [0,3,7,10], [0,3,6,10]
+    ];
+    // Seventh chord quality suffix per degree
+    const seventhSuffix = ['maj7','m7','m7','maj7','7','m7','ø7'];
+
+    // Piano range: C4=60 to C6=84
+    const PIANO_LOW = 60;  // C4
+    const PIANO_HIGH = 84; // C6
+
+    function midiToFreq(midi) {
+      return 440 * Math.pow(2, (midi - 69) / 12);
+    }
+
+    // Build a close-position voicing starting from a given root midi note
+    function buildVoicing(rootMidi, intervals) {
+      // Place each interval above the root, keeping each note >= previous note
+      const voiced = [rootMidi];
+      for (let i = 1; i < intervals.length; i++) {
+        let note = rootMidi + intervals[i];
+        // If this note is lower than or equal to the previous, raise it an octave
+        while (note <= voiced[voiced.length - 1]) note += 12;
+        voiced.push(note);
+      }
+      return voiced;
+    }
+
+    // Voice a chord for the first position: pick a random root octave that keeps all notes in range
+    function voiceFirstChord(keyPitchClass, degreeOffset, intervals) {
+      const rootPitchClass = (keyPitchClass + degreeOffset) % 12;
+      // Find all valid root midi values in range such that the whole close-position chord fits
+      const candidates = [];
+      for (let rootMidi = PIANO_LOW; rootMidi <= PIANO_HIGH; rootMidi++) {
+        if (rootMidi % 12 !== rootPitchClass) continue;
+        const voiced = buildVoicing(rootMidi, intervals);
+        if (voiced[voiced.length - 1] <= PIANO_HIGH) {
+          candidates.push(voiced);
+        }
+      }
+      // Pick a random valid voicing
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    // Voice a subsequent chord close to the previous voicing
+    function smoothVoice(keyPitchClass, degreeOffset, intervals, prevVoiced) {
+      const rootPitchClass = (keyPitchClass + degreeOffset) % 12;
+      const prevCenter = prevVoiced.reduce((a, b) => a + b, 0) / prevVoiced.length;
+      // Find all valid voicings and pick the one whose center is closest to prevCenter
+      const candidates = [];
+      for (let rootMidi = PIANO_LOW; rootMidi <= PIANO_HIGH; rootMidi++) {
+        if (rootMidi % 12 !== rootPitchClass) continue;
+        const voiced = buildVoicing(rootMidi, intervals);
+        if (voiced[voiced.length - 1] <= PIANO_HIGH) {
+          const center = voiced.reduce((a, b) => a + b, 0) / voiced.length;
+          candidates.push({ voiced, dist: Math.abs(center - prevCenter) });
+        }
+      }
+      candidates.sort((a, b) => a.dist - b.dist);
+      return candidates[0].voiced;
+    }
+
+    const chords = (() => {
+      let key = null;
+      let sequence = [];
+
+      function updateSliderFill() {
+        const slider = document.getElementById('chord-count-slider');
+        const val = (slider.value - slider.min) / (slider.max - slider.min) * 100;
+        slider.style.background = `linear-gradient(to right, #473742 ${val}%, #C9B2A4 ${val}%)`;
+      }
+
+      function handleSliderChange() {
+        updateSliderFill();
+        generateNewSequence();
+      }
+
+      function generateNewKey() {
+        const rootPool = notes.slice(6, 18);
+        const selectedRoot = rootPool[Math.floor(Math.random() * rootPool.length)];
+        const sharpName = selectedRoot.name.replace(/[0-9]/g, '');
+        let displayLabel;
+        if (enharmonics[sharpName]) {
+          displayLabel = Math.random() < 0.5 ? sharpName : enharmonics[sharpName];
+        } else {
+          displayLabel = sharpName;
+        }
+        key = { displayLabel, sharpLabel: sharpName, rootFreq: selectedRoot.freq };
+        document.getElementById('chords-key-text').innerText = displayLabel;
+        generateNewSequence();
+      }
+
+      function generateNewSequence() {
+        if (!key) return;
+        const count = parseInt(document.getElementById('chord-count-slider').value);
+        const container = document.getElementById('chord-container');
+        container.innerHTML = '';
+        sequence = [];
+
+        const lookupLabel = key.sharpLabel || key.displayLabel;
+        const rootIndex = noteNamesPool.indexOf(lookupLabel);
+        const keyPitchClass = rootIndex;
+        const nonDiatonic = document.getElementById('outside-key-checkbox').checked;
+
+        // Helper: weighted random pick from [{val, w}]
+        function weightedPick(options) {
+          const total = options.reduce((s, o) => s + o.w, 0);
+          let r = Math.random() * total;
+          for (const o of options) { r -= o.w; if (r <= 0) return o.val; }
+          return options[options.length - 1].val;
+        }
+
+        // Roman numeral names per diatonic degree (triad / seventh)
+        // Standard: uppercase=major, lowercase=minor, no 'm' suffix, 7=seventh
+        const diatonicRoman  = ['I',  'ii',  'iii',  'IV',  'V',  'vi',  'vii°'];
+        const diatonicRoman7 = ['I7', 'ii7', 'iii7', 'IV7', 'V7', 'vi7', 'vii°7'];
+        // Roman numerals for chords within a temp tonic context (same rules)
+        const tonicRoman  = ['I',  'ii',  'iii',  'IV',  'V',  'vi',  'vii°'];
+        const tonicRoman7 = ['I7', 'ii7', 'iii7', 'IV7', 'V7', 'vi7', 'vii°7'];
+        // Roman numeral for the 4 possible temp tonics in the main key (preserving main-key quality)
+        const tonicDegRoman = { 4:'V', 3:'IV', 5:'vi', 1:'ii' };
+
+        // Helper: build a chord entry given a degreeOffset (semitones from key root), intervals, label, roman, style
+        function makeEntry(degreeOffset, intervals, label, roman, style) {
+          return { degreeOffset, intervals, label, roman, style };
+        }
+
+        // Helper: diatonic chord entry for a given scale degree index (0-6)
+        function diatonicEntry(degree, isSeventh, style, romanOverride) {
+          const degreeOffset = scaleDegrees[degree];
+          const intervals = isSeventh ? seventhIntervals[degree] : triadIntervals[degree];
+          const quality = chordQualities[degree];
+          const chordRootSharp = noteNamesPool[(rootIndex + degreeOffset) % 12];
+          const chordRootDisplay = preferredSpelling(chordRootSharp, key.displayLabel);
+          let label;
+          if (isSeventh) {
+            label = chordRootDisplay + seventhSuffix[degree].replace('maj7','M7').replace('ø7','°7');
+          } else {
+            if (quality === 'maj') label = chordRootDisplay;
+            else if (quality === 'min') label = chordRootDisplay + 'm';
+            else label = chordRootDisplay + '°';
+          }
+          const roman = romanOverride || (isSeventh ? diatonicRoman7[degree] : diatonicRoman[degree]);
+          return makeEntry(degreeOffset, intervals, label, roman, style || null);
+        }
+
+        // Diatonic degree probabilities (normal mode)
+        const diatonicProbs = [
+          {val:0,w:15},{val:1,w:4},{val:2,w:3},{val:3,w:15},{val:4,w:45},{val:5,w:15},{val:6,w:3}
+        ];
+        // Secondary dominant mode: probabilities for chords within a temp tonic
+        const secDomProbs = [
+          {val:0,w:20},{val:1,w:2.5},{val:2,w:2.5},{val:3,w:2.5},{val:4,w:60},{val:5,w:10},{val:6,w:2.5}
+        ];
+        // Temp tonic degree picks (as scale degree indices of the main key)
+        const tempTonicOpts = [{val:4,w:15},{val:3,w:15},{val:5,w:45},{val:1,w:25}];
+
+        // Build raw entries list
+        const entries = [];
+        let i = 0;
+        while (i < count) {
+          const remaining = count - i;
+
+          if (nonDiatonic && Math.random() < 0.13 && remaining >= 2) {
+            // Tonic-shifted subsequence
+            const tonicDeg = weightedPick(tempTonicOpts);       // scale degree of temp tonic
+            const maxN = Math.min(3, remaining - 1);
+            const n = 1 + Math.floor(Math.random() * maxN);     // 1..maxN shifted chords
+            // The temp tonic's pitch class
+            const tempTonicOffset = scaleDegrees[tonicDeg];
+
+            for (let j = 0; j < n && i < count - 1; j++, i++) {
+              const deg = weightedPick(secDomProbs);
+              const isSeventh = Math.random() < 0.35;
+              // degreeOffset relative to the main key root
+              const relOffset = (tempTonicOffset + scaleDegrees[deg]) % 12;
+              const intervals = isSeventh ? seventhIntervals[deg] : triadIntervals[deg];
+              const quality = chordQualities[deg];
+              const chordRootSharp = noteNamesPool[(rootIndex + relOffset) % 12];
+              const chordRootDisplay = preferredSpelling(chordRootSharp, key.displayLabel);
+              let label;
+              if (isSeventh) {
+                label = chordRootDisplay + seventhSuffix[deg].replace('maj7','M7').replace('ø7','°7');
+              } else {
+                if (quality === 'maj') label = chordRootDisplay;
+                else if (quality === 'min') label = chordRootDisplay + 'm';
+                else label = chordRootDisplay + '°';
+              }
+              const localRoman = isSeventh ? tonicRoman7[deg] : tonicRoman[deg];
+              const roman = localRoman + ' / ' + tonicDegRoman[tonicDeg];
+              entries.push(makeEntry(relOffset, intervals, label, roman, 'tonicshift'));
+            }
+            // Now add the resolution chord (the temp tonic itself)
+            const isSeventh = Math.random() < 0.35;
+            entries.push(diatonicEntry(tonicDeg, isSeventh, null));
+            i++;
+          } else {
+            // Normal diatonic chord
+            const degree = weightedPick(diatonicProbs);
+            const isSeventh = Math.random() < 0.35;
+            entries.push(diatonicEntry(degree, isSeventh, null));
+            i++;
+          }
+        }
+
+        // V substitution pass (only in non-diatonic mode)
+        if (nonDiatonic) {
+          // Non-diatonic chromatic chords (absolute degreeOffset from key root)
+          function makeChromatic(degOffset, intervals, label, roman) {
+            return makeEntry(degOffset, intervals, label, roman, 'chromatic');
+          }
+          const bII7Intervals = [0,4,7,10];   // dom7
+          const bIIIaugIntervals = [0,4,8];    // augmented triad
+          const viiDim7Intervals = [0,3,6,9];  // fully diminished 7
+
+          for (let idx = 0; idx < entries.length; idx++) {
+            const e = entries[idx];
+            // Identify V chords: degreeOffset == 7 (dominant)
+            if (e.degreeOffset === scaleDegrees[4]) {
+              const r = Math.random();
+              const subOpts = [
+                () => {
+                  const root = noteNamesPool[(rootIndex + 1) % 12];
+                  const display = preferredSpelling(root, key.displayLabel);
+                  return makeChromatic(1, bII7Intervals, display + '7', 'bII7');
+                },
+                () => {
+                  const root = noteNamesPool[(rootIndex + 3) % 12];
+                  const display = preferredSpelling(root, key.displayLabel);
+                  return makeChromatic(3, bIIIaugIntervals, display + '+', 'bIII+');
+                },
+                () => {
+                  const root = noteNamesPool[(rootIndex + 11) % 12];
+                  const display = preferredSpelling(root, key.displayLabel);
+                  return makeChromatic(11, viiDim7Intervals, display + '°7', 'vii°7');
+                }
+              ];
+              const sub = subOpts[Math.floor(Math.random() * 3)];
+              if (r < 0.10) {
+                // Replace the V chord itself
+                entries[idx] = sub();
+              } else if (r < 0.20 && idx > 0) {
+                // Replace the previous chord
+                entries[idx - 1] = sub();
+              }
+            }
+          }
+        }
+
+        // Now voice and render
+        let prevVoiced = null;
+        for (const entry of entries) {
+          let voiced;
+          if (prevVoiced === null) {
+            voiced = voiceFirstChord(keyPitchClass, entry.degreeOffset, entry.intervals);
+          } else {
+            voiced = smoothVoice(keyPitchClass, entry.degreeOffset, entry.intervals, prevVoiced);
+          }
+          prevVoiced = voiced;
+          sequence.push({ ...entry, voiced });
+
+          const circle = document.createElement('div');
+          circle.className = 'note-circle chord';
+          if (entry.style === 'tonicshift') circle.classList.add('tonicshift');
+          if (entry.style === 'chromatic') circle.classList.add('chromatic');
+          circle.innerHTML = '<span>?</span>';
+          container.appendChild(circle);
+        }
+      }
+
+      function playSequence() {
+        if (!key) return;
+        ctx.resume();
+        const now = ctx.currentTime;
+        sequence.forEach((chord, i) => {
+          const startTime = now + i * 0.9;
+          const noteVol = chord.voiced.length <= 3 ? 0.15 : 0.11;
+          chord.voiced.forEach(midi => {
+            playNote(midiToFreq(midi), startTime, 1.2, noteVol);
+          });
+        });
+      }
+
+      function playCadence() {
+        if (!key) return;
+        ctx.resume();
+        const root = key.rootFreq;
+        const now = ctx.currentTime;
+        const playChord = (offs, time) => offs.forEach(o => playNote(root * Math.pow(2, o / 12), time, 1.2, 0.15));
+        playChord([0, 4, 7], now);
+        playChord([0, 5, 9], now + 0.45);
+        playChord([-1, 2, 7], now + 0.9);
+        playChord([0, 4, 7], now + 1.35);
+      }
+
+      function reveal() {
+        const circles = document.getElementById('chord-container').children;
+        sequence.forEach((chord, i) => {
+          const circle = circles[i];
+          if (!circle.classList.contains('correct')) {
+            circle.innerHTML = `<span>${chord.label}</span><span class="chord-roman">${chord.roman}</span>`;
+            if (chord.style === 'tonicshift') circle.classList.add('tonicshift');
+            if (chord.style === 'chromatic') circle.classList.add('chromatic');
+            circle.classList.remove('wrong');
+            circle.classList.add('correct');
+          }
+        });
+      }
+
+      function init() {
+        updateSliderFill();
+        generateNewKey();
+      }
+
+      return { generateNewKey, generateNewSequence, playSequence, playCadence, reveal, handleSliderChange, init };
+    })();
+
+    let activeTab = 'notes';
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(`${tabName}-view`).classList.add('active');
+      event.currentTarget.classList.add('active');
+      activeTab = tabName;
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.repeat) return;
+      const name = keyMap[e.key];
+      if (name) { ctx.resume(); playNote(notes.find(n => n.name === name).freq); noteElements[name].classList.add('active'); if (activeTab === 'notes') handleGuess(name); }
+    });
+    document.addEventListener('keyup', e => {
+      const name = keyMap[e.key];
+      if (name) noteElements[name].classList.remove('active');
+    });
+
+    generateNewKey();
+    updateSliderFill();
+    updateJumpFill();
+    chords.init();
+  </script>
+</body>
+</html>
