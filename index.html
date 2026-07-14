@@ -585,51 +585,105 @@
       return 440 * Math.pow(2, (midi - 69) / 12);
     }
 
-    // Build a close-position voicing starting from a given root midi note
-    function buildVoicing(rootMidi, intervals) {
-      // Place each interval above the root, keeping each note >= previous note
-      const voiced = [rootMidi];
-      for (let i = 1; i < intervals.length; i++) {
-        let note = rootMidi + intervals[i];
-        // If this note is lower than or equal to the previous, raise it an octave
-        while (note <= voiced[voiced.length - 1]) note += 12;
-        voiced.push(note);
+    // Generate all valid voicings (including inversions) within [PIANO_LOW, PIANO_HIGH] with max span of 14 semitones
+    function allVoicings(pitchClasses) {
+      const options = pitchClasses.map(pc => {
+        const notes = [];
+        for (let midi = PIANO_LOW; midi <= PIANO_HIGH; midi++)
+          if (midi % 12 === pc) notes.push(midi);
+        return notes;
+      });
+      // Try all orderings of pitch classes (inversions), collect unique sorted voicings within span
+      function permute(arr) {
+        if (arr.length <= 1) return [arr];
+        return arr.flatMap((v, i) => permute([...arr.slice(0,i), ...arr.slice(i+1)]).map(p => [v, ...p]));
       }
-      return voiced;
+      const perms = permute(pitchClasses.map((_, i) => i));
+      const seen = new Set();
+      const result = [];
+      for (const perm of perms) {
+        const permOpts = perm.map(i => options[i]);
+        function cartesian(idx, current) {
+          if (idx === permOpts.length) {
+            const sorted = [...current].sort((a, b) => a - b);
+            const key = sorted.join(',');
+            if (!seen.has(key) && sorted[sorted.length-1] - sorted[0] <= 14) {
+              seen.add(key);
+              result.push(sorted);
+            }
+            return;
+          }
+          for (const val of permOpts[idx]) {
+            if (!current.includes(val)) {
+              current.push(val);
+              cartesian(idx + 1, current);
+              current.pop();
+            }
+          }
+        }
+        cartesian(0, []);
+      }
+      // Fallback: if no compact voicings found, allow span up to 24
+      if (result.length === 0) {
+        for (const perm of perms) {
+          const permOpts = perm.map(i => options[i]);
+          function cartesian2(idx, current) {
+            if (idx === permOpts.length) {
+              const sorted = [...current].sort((a, b) => a - b);
+              const key = sorted.join(',');
+              if (!seen.has(key)) { seen.add(key); result.push(sorted); }
+              return;
+            }
+            for (const val of permOpts[idx]) {
+              if (!current.includes(val)) { current.push(val); cartesian2(idx+1, current); current.pop(); }
+            }
+          }
+          cartesian2(0, []);
+        }
+      }
+      return result;
     }
 
-    // Voice a chord for the first position: pick a random root octave that keeps all notes in range
+    function chordPitchClasses(keyPitchClass, degreeOffset, intervals) {
+      return intervals.map(i => (keyPitchClass + degreeOffset + i) % 12);
+    }
+
+    function maxCrossDistance(a, b) {
+      let max = 0;
+      for (const x of a) for (const y of b) max = Math.max(max, Math.abs(x - y));
+      return max;
+    }
+
     function voiceFirstChord(keyPitchClass, degreeOffset, intervals) {
-      const rootPitchClass = (keyPitchClass + degreeOffset) % 12;
-      // Find all valid root midi values in range such that the whole close-position chord fits
-      const candidates = [];
-      for (let rootMidi = PIANO_LOW; rootMidi <= PIANO_HIGH; rootMidi++) {
-        if (rootMidi % 12 !== rootPitchClass) continue;
-        const voiced = buildVoicing(rootMidi, intervals);
-        if (voiced[voiced.length - 1] <= PIANO_HIGH) {
-          candidates.push(voiced);
-        }
-      }
-      // Pick a random valid voicing
-      return candidates[Math.floor(Math.random() * candidates.length)];
+      const pcs = chordPitchClasses(keyPitchClass, degreeOffset, intervals);
+      const voicings = allVoicings(pcs);
+      return voicings[Math.floor(Math.random() * voicings.length)];
     }
 
-    // Voice a subsequent chord close to the previous voicing
     function smoothVoice(keyPitchClass, degreeOffset, intervals, prevVoiced) {
-      const rootPitchClass = (keyPitchClass + degreeOffset) % 12;
-      const prevCenter = prevVoiced.reduce((a, b) => a + b, 0) / prevVoiced.length;
-      // Find all valid voicings and pick the one whose center is closest to prevCenter
-      const candidates = [];
-      for (let rootMidi = PIANO_LOW; rootMidi <= PIANO_HIGH; rootMidi++) {
-        if (rootMidi % 12 !== rootPitchClass) continue;
-        const voiced = buildVoicing(rootMidi, intervals);
-        if (voiced[voiced.length - 1] <= PIANO_HIGH) {
-          const center = voiced.reduce((a, b) => a + b, 0) / voiced.length;
-          candidates.push({ voiced, dist: Math.abs(center - prevCenter) });
-        }
+      const pcs = chordPitchClasses(keyPitchClass, degreeOffset, intervals);
+      const voicings = allVoicings(pcs);
+      if (voicings.length === 0) return voiceFirstChord(keyPitchClass, degreeOffset, intervals);
+
+      // Detect repeated chord (same pitch classes as previous)
+      const prevPCs = new Set(prevVoiced.map(m => m % 12));
+      const samePCs = pcs.length === prevPCs.size && pcs.every(pc => prevPCs.has(pc));
+      const prevStr = prevVoiced.slice().sort((a,b)=>a-b).join(',');
+
+      // Score all voicings by cross-distance to prev
+      let scored = voicings.map(v => ({ v, d: maxCrossDistance(v, prevVoiced) }));
+
+      // For repeated chords, exclude the same voicing
+      if (samePCs && scored.length > 1) {
+        const others = scored.filter(s => s.v.join(',') !== prevStr);
+        if (others.length > 0) scored = others;
       }
-      candidates.sort((a, b) => a.dist - b.dist);
-      return candidates[0].voiced;
+
+      // Sort by distance, then pick randomly among those within 2 semitones of the best
+      scored.sort((a, b) => a.d - b.d);
+      const best = scored[0].d;
+      const close = scored.filter(s => s.d <= best + 2);
+      return close[Math.floor(Math.random() * close.length)].v;
     }
 
     const chords = (() => {
@@ -817,6 +871,12 @@
               }
             }
           }
+        }
+
+        // 30% chance: replace last chord with I (or I7)
+        if (entries.length > 0 && Math.random() < 0.30) {
+          const isSeventh = Math.random() < 0.35;
+          entries[entries.length - 1] = diatonicEntry(0, isSeventh, null);
         }
 
         // Now voice and render
