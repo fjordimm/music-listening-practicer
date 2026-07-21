@@ -353,6 +353,20 @@
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     const ctx = new AudioContext();
 
+    // Master signal chain: all notes → masterGain → compressor → destination
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = 0.4;
+
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -24;  // start compressing at -24 dBFS
+    compressor.knee.value = 8;
+    compressor.ratio.value = 6;        // 6:1 ratio
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.15;
+
+    masterGain.connect(compressor);
+    compressor.connect(ctx.destination);
+
     const notes = [
       { name: 'C4', freq: 261.63, type: 'white' }, { name: 'C#4', freq: 277.18, type: 'black' },
       { name: 'D4', freq: 293.66, type: 'white' }, { name: 'D#4', freq: 311.13, type: 'black' },
@@ -564,7 +578,7 @@
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, startTime);
       osc.connect(gainNode);
-      gainNode.connect(ctx.destination);
+      gainNode.connect(masterGain);
       gainNode.gain.setValueAtTime(0, startTime);
       gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.01);
       gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
