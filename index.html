@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Music Listening Practice</title>
+  <title>Piano Trainer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@300;500;700;800&display=swap" rel="stylesheet">
@@ -95,7 +95,7 @@
     }
     .speaker-btn:hover { opacity: 1; }
     .circles-row { display: flex; align-items: center; gap: 8px; width: 100%; justify-content: center; }
-    .key-controls { display: flex; gap: 8px; width: 100%; }
+    .key-controls { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 
     .sliders-stack { display: flex; flex-direction: column; gap: 6px; width: 100%; }
     .labeled-slider { display: flex; align-items: center; gap: 8px; width: 100%; }
@@ -175,6 +175,25 @@
       flex: 1;
     }
     .control-btn:hover { opacity: 0.85; }
+    .scale-select {
+      background: #C9B2A4;
+      color: #473742;
+      border: 1.5px solid #473742;
+      border-radius: 12px;
+      padding: 7px 28px 7px 10px;
+      font-family: 'Mukta', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      appearance: none;
+      -webkit-appearance: none;
+      text-align: center;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23473742' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+    }
+    .scale-select:focus { outline: none; }
     .secondary-btns { display: flex; gap: 8px; width: 100%; }
 
     .checkbox-label {
@@ -215,13 +234,12 @@
       transform: rotate(45deg) translate(-1px, -1px);
     }
 
-    .piano-wrapper { background: #473742; border-radius: 1.5vw; padding: 1.5vw; width: 100%; margin-bottom: 10px; }
-    #piano-section { width: calc(100% - 30px); margin-top: auto; }
+    #piano-section { width: calc(100% + 30px); margin-top: auto; margin-left: -15px; margin-right: -15px; margin-bottom: -15px; background: #473742; padding: 1.5vw 1.5vw 1.5vw 1.5vw; }
     .piano { display: flex; position: relative; width: 100%; aspect-ratio: 15 / 4; user-select: none; }
     .key { cursor: pointer; }
     .white { flex: 1; height: 100%; background: #D8C1B4; border-right: 0.1vw solid #473742; z-index: 1; border-radius: 0 0 1vw 1vw; }
-    .white.first-key { border-left: 0.1vw solid #473742; border-radius: 1vw 0 1vw 1vw; }
-    .white.last-key { border-radius: 0 1vw 1vw 1vw; }
+    .white.first-key { border-left: 0.1vw solid #473742; border-radius: 0 0 1vw 1vw; }
+    .white.last-key { border-radius: 0 0 1vw 1vw; }
     .white.active { background: #c4a99a; }
     .black { width: calc((100% / 15) * 0.65); height: 60%; background: #221a20; position: absolute; z-index: 2; border-radius: 0 0 0.7vw 0.7vw; }
     .black.active { background: #6b5565; }
@@ -245,6 +263,15 @@
           </button>
         </div>
         <div class="key-controls">
+            <select class="scale-select" id="scale-select" onchange="generateNewSequence()">
+              <option value="major">Major</option>
+              <option value="minor_natural">Minor (Natural)</option>
+              <option value="minor_melodic">Minor (Melodic)</option>
+              <option value="mixolydian">Mixolydian</option>
+              <option value="dorian">Dorian</option>
+              <option value="blues">Blues</option>
+              <option value="chromatic">Chromatic</option>
+            </select>
             <button class="control-btn" onclick="silenceAll(); generateNewKey(); playCadence()">Next</button>
         </div>
       </div>
@@ -319,9 +346,7 @@
   </div>
 
   <div id="piano-section">
-    <div class="piano-wrapper">
-      <div class="piano" id="piano"></div>
-    </div>
+    <div class="piano" id="piano"></div>
   </div>
 
   <script>
@@ -347,18 +372,85 @@
     const noteNamesPool = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const majorIntervals = [0, 2, 4, 5, 7, 9, 11];
 
+    const scaleIntervals = {
+        major:         [0, 2, 4, 5, 7, 9, 11],
+        minor_natural: [0, 2, 3, 5, 7, 8, 10],
+        minor_melodic: [0, 2, 3, 5, 7, 9, 11],
+        mixolydian:    [0, 2, 4, 5, 7, 9, 10],
+        dorian:        [0, 2, 3, 5, 7, 9, 10],
+        blues:         [0, 3, 5, 6, 7, 10],
+        chromatic:     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    };
+
     // Enharmonic equivalents: sharp -> flat
     const enharmonics = { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' };
     const flatToSharp = Object.fromEntries(Object.entries(enharmonics).map(([k,v]) => [v,k]));
 
-    // Keys that conventionally use flats (Db, Eb, Ab, Bb; Gb is debatable but include it)
+    // Keys that conventionally use flats
     const flatKeys = new Set(['Db', 'Eb', 'Gb', 'Ab', 'Bb']);
 
-    // Given a key's display label, return the preferred spelling for a pitch class (sharp name)
+    // Used by chords tab: key-based spelling only
     function preferredSpelling(sharpName, keyDisplayLabel) {
         const useFlats = flatKeys.has(keyDisplayLabel);
         if (useFlats && enharmonics[sharpName]) return enharmonics[sharpName];
         return sharpName;
+    }
+
+    const letters = ['C','D','E','F','G','A','B'];
+
+    // Derive note spellings for every pitch class in a given scale+key
+    function deriveScaleSpellings(rootDisplayName, scale) {
+      const rootSharp = flatToSharp[rootDisplayName] || rootDisplayName;
+      const rootPc = noteNamesPool.indexOf(rootSharp);
+      const rootLetter = rootDisplayName.replace(/[#b]/g, '');
+      const rootLetterIdx = letters.indexOf(rootLetter);
+      const result = {};
+
+      if (scale === 'blues') {
+        // Blues: prefer flat spellings for b3, b5, b7
+        const intervals = [0,3,5,6,7,10];
+        intervals.forEach(semis => {
+          const pc = (rootPc + semis) % 12;
+          const sharp = noteNamesPool[pc];
+          // Always use flat spelling for altered (black key) tones in blues
+          result[pc] = enharmonics[sharp] || sharp;
+        });
+        // Root and 4th/5th are natural — fix those back
+        [0, 5, 7].forEach(semis => {
+          const pc = (rootPc + semis) % 12;
+          result[pc] = noteNamesPool[pc]; // natural note, no flat needed
+        });
+        return result;
+      }
+
+      if (scale === 'chromatic') {
+        const useFlats = ['F','Bb','Eb','Ab','Db','Gb'].includes(rootDisplayName);
+        for (let i = 0; i < 12; i++) {
+          const pc = (rootPc + i) % 12;
+          const sharp = noteNamesPool[pc];
+          result[pc] = (useFlats && enharmonics[sharp]) ? enharmonics[sharp] : sharp;
+        }
+        return result;
+      }
+
+      // Diatonic scales: assign each degree a unique letter name
+      const intervals = scaleIntervals[scale] || scaleIntervals.major;
+      intervals.forEach((semis, degIdx) => {
+        const pc = (rootPc + semis) % 12;
+        const expectedLetter = letters[(rootLetterIdx + degIdx) % 7];
+        const naturalPc = noteNamesPool.indexOf(expectedLetter);
+        if (naturalPc === pc) {
+          result[pc] = expectedLetter;
+        } else if ((naturalPc + 1) % 12 === pc) {
+          result[pc] = expectedLetter + '#';
+        } else if ((naturalPc - 1 + 12) % 12 === pc) {
+          result[pc] = expectedLetter + 'b';
+        } else {
+          // Double accidental fallback
+          result[pc] = enharmonics[noteNamesPool[pc]] || noteNamesPool[pc];
+        }
+      });
+      return result;
     }
 
     let currentKey = null;
@@ -401,7 +493,9 @@
         // Use sharp label for scale lookup (noteNamesPool is sharps-based)
         const lookupLabel = currentKey.sharpLabel || currentKey.displayLabel;
         const rootIndex = noteNamesPool.indexOf(lookupLabel);
-        const allowedNames = majorIntervals.map(i => noteNamesPool[(rootIndex + i) % 12]);
+        const selectedScale = document.getElementById('scale-select').value;
+        const intervals = scaleIntervals[selectedScale] || majorIntervals;
+        const allowedNames = intervals.map(i => noteNamesPool[(rootIndex + i) % 12]);
         const scalePool = notes.filter(n => allowedNames.includes(n.name.replace(/[0-9]/g, '')));
 
         const noteOrder = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -422,7 +516,9 @@
             }
             const randomNote = candidates[Math.floor(Math.random() * candidates.length)];
             const pitchSharp = randomNote.name.replace(/[0-9]/g, '');
-            const displayPitch = preferredSpelling(pitchSharp, currentKey.displayLabel);
+            const spellings = deriveScaleSpellings(currentKey.displayLabel, selectedScale);
+            const pc = noteNamesPool.indexOf(pitchSharp);
+            const displayPitch = spellings[pc] || pitchSharp;
             currentSequence.push({ ...randomNote, displayPitch });
             const circle = document.createElement('div');
             circle.className = 'note-circle';
@@ -490,15 +586,36 @@
     function playCadence() {
         if (!currentKey) return;
         ctx.resume();
-        // Play at the ACTUAL root frequency selected (F#4-F5)
-        let root = currentKey.rootFreq;
+        const root = currentKey.rootFreq;
         const now = ctx.currentTime;
-        const playChord = (offs, time) => offs.forEach(o => playNote(root * Math.pow(2, o / 12), time, 1.2, 0.15));
-        
-        playChord([0, 4, 7], now); 
-        playChord([0, 5, 9], now + 0.45); 
-        playChord([-1, 2, 7], now + 0.9); 
-        playChord([0, 4, 7], now + 1.35);
+        const playChord = (semitones, time) =>
+            semitones.forEach(s => playNote(root * Math.pow(2, s / 12), time, 1.2, 0.15));
+
+        const scale = document.getElementById('scale-select').value;
+
+        // Chord shapes relative to root (semitones from key root)
+        // I/i: root position
+        const I   = [0, 4, 7];    // major I, root in bass
+        const i   = [0, 3, 7];    // minor i, root in bass
+        // IV/iv: 2nd inversion (5th in bass = key root)
+        const IV  = [0, 5, 9];    // major IV, 5th (=key root) in bass
+        const iv  = [0, 5, 8];    // minor iv, 5th (=key root) in bass
+        // V/v: 1st inversion (3rd in bass, one semitone below key root)
+        const V   = [-1, 2, 7];  // major V, major 3rd in bass
+        const v   = [-2, 2, 7];  // minor v, minor 3rd in bass
+
+        const cadences = {
+            major:         [I,  IV, V,  I],
+            minor_natural: [i,  iv, v,  i],
+            minor_melodic: [i,  iv, V,  i],
+            mixolydian:    [I,  IV, v,  I],
+            dorian:        [i,  IV, v,  i],
+            blues:         [i,  iv, v,  i],
+            chromatic:     [I,  IV, V,  I],
+        };
+
+        const chords = cadences[scale] || cadences.major;
+        chords.forEach((chord, idx) => playChord(chord, now + idx * 0.45));
     }
 
     function revealSequence() {
@@ -739,10 +856,10 @@
         // Roman numeral names per diatonic degree (triad / seventh)
         // Standard: uppercase=major, lowercase=minor, no 'm' suffix, 7=seventh
         const diatonicRoman  = ['I',  'ii',  'iii',  'IV',  'V',  'vi',  'vii°'];
-        const diatonicRoman7 = ['I7', 'ii7', 'iii7', 'IV7', 'V7', 'vi7', 'vii°7'];
+        const diatonicRoman7 = ['I7', 'ii7', 'iii7', 'IV7', 'V7', 'vi7', 'viiø7'];
         // Roman numerals for chords within a temp tonic context (same rules)
         const tonicRoman  = ['I',  'ii',  'iii',  'IV',  'V',  'vi',  'vii°'];
-        const tonicRoman7 = ['I7', 'ii7', 'iii7', 'IV7', 'V7', 'vi7', 'vii°7'];
+        const tonicRoman7 = ['I7', 'ii7', 'iii7', 'IV7', 'V7', 'vi7', 'viiø7'];
         // Roman numeral for the 4 possible temp tonics in the main key (preserving main-key quality)
         const tonicDegRoman = { 4:'V', 3:'IV', 5:'vi', 1:'ii' };
 
@@ -760,7 +877,7 @@
           const chordRootDisplay = preferredSpelling(chordRootSharp, key.displayLabel);
           let label;
           if (isSeventh) {
-            label = chordRootDisplay + seventhSuffix[degree].replace('maj7','M7').replace('ø7','°7');
+            label = chordRootDisplay + seventhSuffix[degree].replace('maj7','M7');
           } else {
             if (quality === 'maj') label = chordRootDisplay;
             else if (quality === 'min') label = chordRootDisplay + 'm';
@@ -806,7 +923,7 @@
               const chordRootDisplay = preferredSpelling(chordRootSharp, key.displayLabel);
               let label;
               if (isSeventh) {
-                label = chordRootDisplay + seventhSuffix[deg].replace('maj7','M7').replace('ø7','°7');
+                label = chordRootDisplay + seventhSuffix[deg].replace('maj7','M7');
               } else {
                 if (quality === 'maj') label = chordRootDisplay;
                 else if (quality === 'min') label = chordRootDisplay + 'm';
