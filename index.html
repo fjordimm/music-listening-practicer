@@ -22,7 +22,10 @@
       overflow-y: auto;
     }
 
-    .tabs { display: flex; margin-bottom: 12px; }
+    .tabs-bar { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 12px; width: 100%; max-width: 900px; }
+    .tabs { display: flex; }
+    .sound-selector { display: flex; align-items: center; gap: 8px; }
+    .sound-label { font-size: 0.85rem; font-weight: 700; color: #473742; }
 
     .tab {
       padding: 3px 22px;
@@ -248,9 +251,19 @@
 </head>
 <body>
 
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('notes')">Notes</div>
-    <div class="tab" onclick="switchTab('chords')">Chords</div>
+  <div class="tabs-bar">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('notes')">Notes</div>
+      <div class="tab" onclick="switchTab('chords')">Chords</div>
+    </div>
+    <div class="sound-selector">
+      <span class="sound-label">Sound</span>
+      <select class="scale-select" id="sound-select" onchange="document.getElementById('sound-select').value">
+        <option value="triangle" selected>Triangle</option>
+        <option value="sine">Sine</option>
+        <option value="sawtooth">Sawtooth</option>
+      </select>
+    </div>
   </div>
 
   <div id="notes-view" class="view active">
@@ -575,7 +588,7 @@
     function playNote(freq, startTime = ctx.currentTime, duration = 0.8, volume = 0.25) {
       const osc = ctx.createOscillator();
       const gainNode = ctx.createGain();
-      osc.type = 'sine';
+      osc.type = document.getElementById('sound-select').value;
       osc.frequency.setValueAtTime(freq, startTime);
       osc.connect(gainNode);
       gainNode.connect(masterGain);
